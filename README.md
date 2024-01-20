@@ -1,6 +1,8 @@
 # filter-cloudflare
 filter hosts on cloudflare
 
+* no dependency instead python >= 3.9
+
 Usage:
 
 ```bash
