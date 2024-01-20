@@ -28,8 +28,8 @@ WHITE = "\x1b[37m"
 CLOUD_CACHE_PATH = Path.home() / ".cache" / "clowdflare"
 CLOUD_IPSV4_PATH = CLOUD_CACHE_PATH / "ips-v4"
 CLOUD_IPSV6_PATH = CLOUD_CACHE_PATH / "ips-v6"
-CLOUD_IPVS4_URL = "https://www.cloudflare.com/ips-v4/"
-CLOUD_IPVS6_URL = "https://www.cloudflare.com/ips-v6/"
+CLOUD_IPSV4_URL = "https://www.cloudflare.com/ips-v4/"
+CLOUD_IPSV6_URL = "https://www.cloudflare.com/ips-v6/"
 
 
 stderr = partial(print, file=sys.stderr)
@@ -62,10 +62,19 @@ def parse_args(argv):
         type=int,
     )
     parser.add_argument(
-        "-f",
-        "--force-update-ips",
+        "-F",
+        "--force-download-ips",
+        "--force-download",
         "--force",
-        help="force update cloudflare servers ip lists",
+        help="force download cloudflare servers ip lists",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+    )
+    parser.add_argument(
+        "-S",
+        "--skip-download-ips",
+        "--skip-download",
+        help="skip download cloudflare servers ip lists",
         default=False,
         action=argparse.BooleanOptionalAction,
     )
@@ -80,22 +89,25 @@ def main(argv=None):
     if not args.list.isatty():
         hosts.extend(map(str.strip, args.list))
 
-    for url, path in [
-        (CLOUD_IPVS4_URL, CLOUD_IPSV4_PATH),
-        (CLOUD_IPVS6_URL, CLOUD_IPSV6_PATH),
-    ]:
-        download_file(url, path, args.force_update_ips)
+    if not args.skip_download_ips:
+        for url, path in [
+            (CLOUD_IPSV4_URL, CLOUD_IPSV4_PATH),
+            (CLOUD_IPSV6_URL, CLOUD_IPSV6_PATH),
+        ]:
+            download_file(url, path, args.force_download_ips)
 
-    stderr(f"{YELLOW}{len(hosts)=}, {args.proc=}{RESET}")
+    stderr(
+        YELLOW + "hosts:", len(hosts), "; processes:", str(args.proc) + RESET
+    )
     with multiprocessing.Pool(args.proc) as pool:
-        for host, is_cloudflare in pool.imap_unordered(check_cloudflare, hosts):
-            if is_cloudflare:
-                stderr(f"{PURPLE}host on cloudflare: {host}{RESET}")
-            else:
-                stderr(f"{GREEN}cloudflare not detected: {host}{RESET}")
-                print(host)
-
-    stderr(f"{YELLOW}Finished!{RESET}")
+        try:
+            for host, result in pool.imap_unordered(is_cloudflare, hosts):
+                if not result:
+                    print(host)
+            stderr(YELLOW + "Finished!" + RESET)
+        except KeyboardInterrupt:
+            stderr(RED + "Program interrupted by user..." + RESET)
+            return 1
 
 
 @lru_cache
@@ -119,17 +131,25 @@ def get_ip4(host, port=0):
     )[4][0]
 
 
-def check_cloudflare(host):
+def is_cloudflare(host):
     try:
         ip = ipaddress.IPv4Address(get_ip4(host))
     except socket.gaierror:
-        stderr(f"{RED}ip address not found: {host}{RESET}")
+        stderr(RED + "ip address not found: " + host + RESET)
     else:
         for subnet in get_cloudflare_subnets():
+            contains = ip in subnet
             stderr(
-                f"{CYAN}check ip {ip.compressed} ({host=}) in range {subnet.compressed}{RESET}"
+                CYAN
+                + "ip {} ({}) NOT IN range {}: {}".format(
+                    ip.compressed,
+                    host,
+                    subnet.compressed,
+                    [RED + "NO", GREEN + "YES"][not contains],
+                )
+                + RESET
             )
-            if ip in subnet:
+            if contains:
                 return host, True
     return host, False
 
@@ -151,16 +171,16 @@ def download_file(url, path, force=False):
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("wb+") as fp:
                 shutil.copyfileobj(resp, fp)
-            stderr(f"{GREEN}url {url} retrieved as {path}{RESET}")
+            stderr(GREEN + "url", url, "retrieved as " + path + RESET)
     except urllib.error.URLError as err:
         # Если файл на сервере не был модифицирован
         if err.code == 304:
             stderr(
-                f"{BLUE}skip download: resource {url} is not modified{RESET}"
+                BLUE + "skip download: resource", url, "is not modified" + RESET
             )
             return
-        stderr(f"{RED}{err}{RESET}")
+        stderr(RED + str(err) + RESET)
 
 
 if "__main__" == __name__:
-    main()
+    sys.exit(main())
