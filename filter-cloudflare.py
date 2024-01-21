@@ -96,18 +96,27 @@ def main(argv=None):
         ]:
             download_file(url, path, args.force_download_ips)
 
+    proc_num = min(args.proc, len(hosts))
+
     stderr(
-        YELLOW + "hosts:", len(hosts), "; processes:", str(args.proc) + RESET
+        YELLOW,
+        "total hosts: ",
+        len(hosts),
+        "; working processes: ",
+        proc_num,
+        RESET,
+        sep="",
     )
-    with multiprocessing.Pool(args.proc) as pool:
+    with multiprocessing.Pool(proc_num) as pool:
         try:
-            for host, result in pool.imap_unordered(is_cloudflare, hosts):
-                if not result:
+            for host, checked in pool.imap_unordered(check_host, hosts):
+                if checked:
                     print(host)
+                else:
+                    stderr(PURPLE + "skip host:", host + RESET)
             stderr(YELLOW + "Finished!" + RESET)
         except KeyboardInterrupt:
-            stderr(RED + "Program interrupted by user..." + RESET)
-            return 1
+            stderr(YELLOW + "Program interrupted by user..." + RESET)
 
 
 @lru_cache
@@ -131,26 +140,32 @@ def get_ip4(host, port=0):
     )[4][0]
 
 
-def is_cloudflare(host):
-    try:
-        ip = ipaddress.IPv4Address(get_ip4(host))
-    except socket.gaierror:
-        stderr(RED + "ip address not found: " + host + RESET)
-    else:
-        for subnet in get_cloudflare_subnets():
-            contains = ip in subnet
-            stderr(
-                CYAN
-                + "ip {} ({}) NOT IN range {}: {}".format(
-                    ip.compressed,
-                    host,
-                    subnet.compressed,
-                    [RED + "NO", GREEN + "YES"][not contains],
-                )
-                + RESET
+def check_cloudflare(host):
+    ip = ipaddress.IPv4Address(get_ip4(host))
+    for subnet in get_cloudflare_subnets():
+        contains = ip in subnet
+        stderr(
+            CYAN
+            + "check {} ({}) in coludflare subnet {}: {}".format(
+                host,
+                ip.compressed,
+                subnet.compressed,
+                [GREEN + "PASS", RED + "FAIL"][contains],
             )
-            if contains:
-                return host, True
+            + RESET
+        )
+        if contains:
+            return True
+    return False
+
+
+def check_host(host):
+    try:
+        if not check_cloudflare(host):
+            return host, True
+        stderr(PURPLE + "detected cloudflare: " + host + RESET)
+    except socket.gaierror:
+        stderr(PURPLE + "host ip address not found: " + host + RESET)
     return host, False
 
 
@@ -171,15 +186,19 @@ def download_file(url, path, force=False):
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("wb+") as fp:
                 shutil.copyfileobj(resp, fp)
-            stderr(GREEN + "url", url, "retrieved as " + path + RESET)
+            stderr(GREEN + "url", url, "retrieved as", path + RESET)
+            return True
     except urllib.error.URLError as err:
         # Если файл на сервере не был модифицирован
         if err.code == 304:
             stderr(
-                BLUE + "skip download: resource", url, "is not modified" + RESET
+                PURPLE + "skip download: resource",
+                url,
+                "is not modified" + RESET,
             )
-            return
-        stderr(RED + str(err) + RESET)
+        else:
+            stderr(RED + str(err) + RESET)
+        return False
 
 
 if "__main__" == __name__:
