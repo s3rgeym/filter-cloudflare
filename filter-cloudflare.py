@@ -143,18 +143,14 @@ def get_ip4(host, port=0):
 def check_cloudflare(host):
     ip = ipaddress.IPv4Address(get_ip4(host))
     for subnet in get_cloudflare_subnets():
-        contains = ip in subnet
         stderr(
             CYAN
             + "check {} ({}) in cloudflare subnet {}: {}".format(
-                host,
-                ip.compressed,
-                subnet.compressed,
-                [GREEN + "PASS", RED + "FAIL"][contains],
+                host, ip.compressed, subnet.compressed, ["-", "+"][ip in subnet]
             )
             + RESET
         )
-        if contains:
+        if ip in subnet:
             return True
     return False
 
@@ -186,7 +182,7 @@ def download_file(url, path, force=False):
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("wb+") as fp:
                 shutil.copyfileobj(resp, fp)
-            stderr(GREEN + "url", url, "retrieved as", path + RESET)
+            stderr(GREEN + "url " + url + " retrieved as " + str(path) + RESET)
             return True
     except urllib.error.URLError as err:
         # Если файл на сервере не был модифицирован
