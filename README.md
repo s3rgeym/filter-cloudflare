@@ -6,5 +6,8 @@ filter hosts on cloudflare
 Usage:
 
 ```bash
-$ python filter-cloudflare.py -l hosts.txt > non-clodflare.txt
+$ python filter-cloudflare.py -l hosts.txt > non-clodf.txt
 ```
+
+![image](https://github.com/s3rgeym/filter-cloudflare/assets/12753171/58b484c9-098e-4be8-90de-6ac9d60b74c3)
+
