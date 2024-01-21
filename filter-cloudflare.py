@@ -57,7 +57,7 @@ def parse_args(argv):
     parser.add_argument(
         "-p",
         "--proc",
-        help="number of processes",
+        help="max number of parallel processes",
         default=max(multiprocessing.cpu_count() - 1, 2),
         type=int,
     )
@@ -102,7 +102,7 @@ def main(argv=None):
         YELLOW,
         "total hosts: ",
         len(hosts),
-        "; working processes: ",
+        "; parallel processes: ",
         proc_num,
         RESET,
         sep="",
@@ -146,7 +146,7 @@ def check_cloudflare(host):
         contains = ip in subnet
         stderr(
             CYAN
-            + "check {} ({}) in coludflare subnet {}: {}".format(
+            + "check {} ({}) in cloudflare subnet {}: {}".format(
                 host,
                 ip.compressed,
                 subnet.compressed,
