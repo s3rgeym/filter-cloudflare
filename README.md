@@ -9,4 +9,5 @@ Usage:
 $ python filter-cloudflare.py -l hosts.txt > non-clodf.txt
 ```
 
-![image](https://github.com/s3rgeym/filter-cloudflare/assets/12753171/6346a616-8d05-471c-90f6-645812ab73f5)
+![image](https://github.com/s3rgeym/filter-cloudflare/assets/12753171/24742ff1-e3b2-4608-b1db-144195e22af1)
+
