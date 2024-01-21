@@ -21,4 +21,7 @@ check www.goodfirms.co (188.114.98.224) in coludflare subnet 188.114.96.0/20: FA
 detected cloudflare: www.goodfirms.co
 skip host: www.goodfirms.co
 Finished!
+
+> python filter-cloudflare.py -l hosts.txt
+...
 ```
